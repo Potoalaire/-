@@ -1,0 +1,375 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyMPmBXfqOcMdeAbdKY0aGvj",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/GerardoMunoz/AlgLin_2025/blob/main/cuestionarios/complexity_features_equation.ipynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import ast"
+      ],
+      "metadata": {
+        "id": "WRpVJx35dOEd"
+      },
+      "execution_count": 39,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "a=ast.parse(\"a = 3*x + 1\", mode=\"exec\")\n",
+        "print(ast.dump(a))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "YMPr81fYdOB3",
+        "outputId": "7613c965-c84a-4ba4-aa8c-09a7c612d0be"
+      },
+      "execution_count": 40,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Module(body=[Assign(targets=[Name(id='a', ctx=Store())], value=BinOp(left=BinOp(left=Constant(value=3), op=Mult(), right=Name(id='x', ctx=Load())), op=Add(), right=Constant(value=1)))], type_ignores=[])\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [],
+      "metadata": {
+        "id": "BjPwRXST88Cn"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import ast\n",
+        "\n",
+        "def complexity_features_equation(eq_str, var=\"x\"):\n",
+        "    \"\"\"\n",
+        "    Calcula métricas de complejidad directamente de un string de ecuación,\n",
+        "    sin simplificar como SymPy.\n",
+        "    Retorna: (terms, parens, depth, repeat_penalty, dispersion)\n",
+        "    \"\"\"\n",
+        "    if \"=\" not in eq_str:\n",
+        "        raise ValueError(\"Equation must contain '='\")\n",
+        "\n",
+        "    left_str, right_str = eq_str.split(\"=\")\n",
+        "\n",
+        "    def analyze(expr_str):\n",
+        "        tree = ast.parse(expr_str, mode='eval')\n",
+        "\n",
+        "        terms = 0\n",
+        "        parens = expr_str.count(\"(\") + expr_str.count(\")\")\n",
+        "        depth_val = 0\n",
+        "        var_count = expr_str.count(var)\n",
+        "\n",
+        "        def visit(node, current_depth=1):\n",
+        "            nonlocal terms, depth_val\n",
+        "            depth_val = max(depth_val, current_depth)\n",
+        "            if isinstance(node, ast.BinOp):\n",
+        "                terms += 1\n",
+        "                visit(node.left, current_depth + 1)\n",
+        "                visit(node.right, current_depth + 1)\n",
+        "            elif isinstance(node, ast.UnaryOp):\n",
+        "                visit(node.operand, current_depth + 1)\n",
+        "            elif isinstance(node, ast.Call):\n",
+        "                terms += 1\n",
+        "                for arg in node.args:\n",
+        "                    visit(arg, current_depth + 1)\n",
+        "            elif isinstance(node, ast.Name) or isinstance(node, ast.Constant):\n",
+        "                pass\n",
+        "            elif hasattr(node, \"body\"):  # defensive\n",
+        "                for sub in node.body:\n",
+        "                    visit(sub, current_depth + 1)\n",
+        "\n",
+        "        visit(tree.body)\n",
+        "        return terms, parens, depth_val, var_count\n",
+        "\n",
+        "    left = analyze(left_str)\n",
+        "    right = analyze(right_str)\n",
+        "\n",
+        "    # combine sides\n",
+        "    terms = left[0] + right[0]\n",
+        "    parens = left[1] + right[1]\n",
+        "    #depth = max(left[2], right[2])\n",
+        "    var_total = left[3] + right[3]\n",
+        "    repeat_penalty = var_total - 1 if var_total > 1 else 0\n",
+        "    dispersion = (1 if (left[3] > 0 and right[3] > 0) else 0)\n",
+        "\n",
+        "    return (terms, parens, repeat_penalty, dispersion) # (terms, parens, depth, repeat_penalty, dispersion)\n"
+      ],
+      "metadata": {
+        "id": "-a8ln4d8fawk"
+      },
+      "execution_count": 41,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"3*x+3*(x-2)-6*(x+(3-x))=6+2*x\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3pd5-W-P8TOv",
+        "outputId": "7756dc76-e144-4ce0-81c4-50072f5fecfb"
+      },
+      "execution_count": 60,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "3*x+3*(x-2)-6*(x+(3-x))=6+2*x (10, 6, 4, 1)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Ecuación inicial\n",
+        "2. Métrica inicial"
+      ],
+      "metadata": {
+        "id": "s4az4C6jBmxP"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"3*x+3*(x-2)-6*(x+(3-x))-2*x=6\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "GEYQukNhJ96n",
+        "outputId": "fa98f498-f18b-4ada-b263-f21448ef8250",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 61,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "3*x+3*(x-2)-6*(x+(3-x))-2*x=6 (10, 6, 4, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Muy bien, se eliminan las variables a la derecha\n",
+        "2. (0,0,0,1) La metrica es coherernte mostrando la mejora"
+      ],
+      "metadata": {
+        "id": "QuKpETZFKFDP"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"3*x+3*x-6-6*x-6*(3-x)-2*x=6\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "YTwNMCwHKVid",
+        "outputId": "1995f379-5f82-4dc7-fb5b-4f2765a05cfa",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 62,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "3*x+3*x-6-6*x-6*(3-x)-2*x=6 (11, 2, 4, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Bien, se quitaron unos paréntesis\n",
+        "2. (-1, 4, 0, 0) El primer ítem no refleja la mejora. Sin embargo, el segundo ítem sí la refleja"
+      ],
+      "metadata": {
+        "id": "ZtXv9UMlKmTt"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"3*x+3*x-6-6*x-18+6*x-2*x=6\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "Vb19usEgLBq-",
+        "outputId": "612ebc04-4e74-4b98-dc07-a7b0f1f14dee",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 64,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "3*x+3*x-6-6*x-18+6*x-2*x=6 (11, 0, 4, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Bien, se eliminó un paréntesis\n",
+        "2. (0, 0, 4, 0) Sí se refleja la mejora en la métrica"
+      ],
+      "metadata": {
+        "id": "H5dKuDUDLPH4"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"4*x-24=6\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "9gIy4EhoLfaV",
+        "outputId": "66476db0-caa8-4d07-8747-68aa9a8a79f4",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 65,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "4*x-24=6 (2, 0, 0, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Bien, Se suman los coeficientes de la x. También se suman las constantes\n",
+        "2. (9, 0, 4, 0) Sí se refleja la mejora en la métrica\n"
+      ],
+      "metadata": {
+        "id": "UFqR0JPcLzHF"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"4*x=30\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "jG47YPwTMYeN",
+        "outputId": "b637dc3e-f525-4cd9-c2d3-1b8f85522452",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 66,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "4*x=30 (1, 0, 0, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Bien, se pasa la constante a la derecha y se opera\n",
+        "2. (1, 0, 0, 0) Sí se ve reflejado en la métrica"
+      ],
+      "metadata": {
+        "id": "1fTPwjz7MiYd"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "eq1 = \"x=30/4\"\n",
+        "print(eq1, complexity_features_equation(eq1))"
+      ],
+      "metadata": {
+        "id": "EV7xPi0GM0W2",
+        "outputId": "33a09657-3542-4eb9-c5fe-bb878e5cd6f8",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 67,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "x=30/4 (1, 0, 0, 0)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "1. Muy bien, finalmente se despeja la x\n",
+        "2. (0, 0, 0, 0) No se ve la mejora en la métrica."
+      ],
+      "metadata": {
+        "id": "BTuEyDiNM6u9"
+      }
+    }
+  ]
+}
